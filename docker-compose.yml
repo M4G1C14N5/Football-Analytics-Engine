@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  # 1. The Database (Postgres)
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - analytics_net
+
+  # 2. The ETL Script (Runs, Scrapes, Finishes)
+  etl_job:
+    build: ./etl_job
+    depends_on:
+      - db
+    env_file: .env
+    networks:
+      - analytics_net
+
+  # 3. The Streamlit Dashboard (The Public UI)
+  dashboard:
+    build: ./dashboard
+    depends_on:
+      - db
+    env_file: .env
+    networks:
+      - analytics_net
+    # Note: We don't expose ports to the host! 
+    # The tunnel accesses this internally on 8501.
+
+  # 4. The Cloudflare Tunnel (The Public Bridge)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: always
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - analytics_net
+
+networks:
+  analytics_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
