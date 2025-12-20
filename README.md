@@ -47,6 +47,18 @@ This approach is more efficient and less costly, as containers don't need to run
 - **Orchestration**: `docker-compose.yml` acts as the "director," linking Postgres database, ETL worker, Dashboard, and Tunnel connector into a single private network
 - **Security (Local)**: `.gitignore` and `.env` pattern ensure database passwords and API tokens never get leaked to GitHub
 
+### MLOps & DevOps Practices
+
+The goal is to involve MLOps best practices throughout the entire project, incorporating principles from both Data Engineering and DevOps:
+
+- **Docker, the Architect**: Designed the core behavior of this project, providing containerization and consistent environments across development and production
+- **Apache Airflow, the Conductor**: DAGs (Directed Acyclic Graphs) are used to manage the ETL pipeline, triggering jobs as requested, and handling job failures and retries automatically
+- **CI/CD Pipeline**: 
+  - Development is done on the local laptop
+  - Git/GitHub provides version control
+  - Testing is automated using GX Core (Great Expectations) for data quality validation
+  - Deployment done in Ubuntu Server
+
 ### Phase 2: The Cloudflare "Renegade" Pivot
 
 #### The Problem
@@ -55,14 +67,7 @@ Local network port-forwarding issues made ZeroTier or standard Nginx setups diff
 
 #### The Solution
 
-Switched to a **Cloudflare Tunnel (Cloudflared)**, which creates a secure, outbound "wormhole" from the server to Cloudflare's edge.
-
-#### Cloudflare Setup
-
-1. **Tunnel Creation**: Created the `FAE_tunnel` in the Cloudflare Zero Trust dashboard
-2. **Connector**: Successfully ran a Connector on the server to link it to the tunnel
-3. **Published Application Route**: Configured a Published Application Route (modern version of a Public Hostname) to map `fae.camuedlabs.org` directly to the dashboard container on port 8501
-4. **DNS Optimization**: No need to manually create A records or expose home IP address; Cloudflare handles DNS routing automatically through the tunnel
+Switched to a **Cloudflare Tunnel (Cloudflared)**, which creates a secure, outbound "wormhole" from the server to Cloudflare's edge. Configured and published application route (`fae.camuedlabs.org`). Nginx is no longer needed since cloudfare alse takes care of reverse proxy.
 
 ## File Structure
 
@@ -95,9 +100,12 @@ football-analytics-project/
 
 - **Containerization**: Docker & Docker Compose
 - **Database**: PostgreSQL
+- **Workflow Orchestration**: Apache Airflow (DAG-based ETL pipeline management)
 - **ETL**: Python (pandas, SQLAlchemy, BeautifulSoup4)
 - **Dashboard**: Streamlit
-- **Reverse Proxy**: Nginx
+- **Data Quality**: GX Core (Great Expectations) for automated testing
+- **Version Control**: Git/GitHub
+- **CI/CD**: Automated testing and deployment pipeline
 - **Tunneling**: Cloudflare Tunnel (Cloudflared)
 - **Domain**: fae.camuedlabs.org
 
@@ -107,13 +115,6 @@ football-analytics-project/
 2. Set up your `.env` file with necessary secrets (DB passwords, API keys)
 3. Configure Cloudflare Tunnel (if deploying publicly)
 4. Run `docker-compose up` to start all services
-
-## Deployment
-
-The project is designed to be deployed on an Ubuntu server with:
-- Docker and Docker Compose installed
-- Cloudflare Tunnel connector configured
-- DNS configured through Cloudflare Zero Trust dashboard
 
 ---
 

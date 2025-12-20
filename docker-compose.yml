@@ -1,40 +1,76 @@
 version: '3.8'
 
+# Shared settings for all Airflow components
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.7.1
+  environment:
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASS}@db:5432/airflow_db
+    - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
+    - AIRFLOW__CORE__LOAD_EXAMPLES=false
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./logs:/opt/airflow/logs
+    - ./plugins:/opt/airflow/plugins
+    - ./etl_job:/opt/airflow/etl_job
+  user: "${AIRFLOW_UID}:0"
+  depends_on:
+    db:
+      condition: service_healthy
+  networks:
+    - analytics_net
+
 services:
-  # 1. The Database (Postgres)
+  # 1. The Database (Shared by Airflow and your Dashboard)
   db:
     image: postgres:15
     restart: always
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: ${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=${DB_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # You'll need an init script here to create the 'airflow_db' database
+      - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - analytics_net
 
-  # 2. The ETL Script (Runs, Scrapes, Finishes)
-  etl_job:
-    build: ./etl_job
-    depends_on:
-      - db
-    env_file: .env
-    networks:
-      - analytics_net
+  # 2. Airflow Setup (Runs migrations and creates the admin user)
+  airflow-init:
+    <<: *airflow-common
+    command: version && airflow db migrate && airflow users create --username admin --firstname peter --lastname parker --role Admin --email admin@example.com --password admin
 
-  # 3. The Streamlit Dashboard (The Public UI)
+  # 3. Airflow Webserver (UI on port 8080)
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: always
+
+  # 4. Airflow Scheduler (Triggers your ETL scripts)
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: always
+
+  # 5. The Streamlit Dashboard
   dashboard:
     build: ./dashboard
+    restart: always
+    env_file: .env
     depends_on:
       - db
-    env_file: .env
     networks:
       - analytics_net
-    # Note: We don't expose ports to the host! 
-    # The tunnel accesses this internally on 8501.
 
-  # 4. The Cloudflare Tunnel (The Public Bridge)
+  # 6. The Cloudflare Tunnel
   tunnel:
     image: cloudflare/cloudflared:latest
     restart: always
