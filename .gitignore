@@ -1,1 +1,20 @@
-logs/
+# Secrets and Credentials
+.env
+
+# Python Environment and Cache
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Data and Logs
+*.log
+uncleaned_data_csv/
+*.csv
+
+# OS and IDE files
+.DS_Store
+.vscode/
+.idea/
