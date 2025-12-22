@@ -5,3 +5,5 @@ fuzzywuzzy
 python-Levenshtein
 sqlalchemy
 psycopg2-binary
+bs4
+selenium

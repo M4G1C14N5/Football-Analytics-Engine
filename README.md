@@ -69,6 +69,22 @@ Local network port-forwarding issues made ZeroTier or standard Nginx setups diff
 
 Switched to a **Cloudflare Tunnel (Cloudflared)**, which creates a secure, outbound "wormhole" from the server to Cloudflare's edge. Configured and published application route (`fae.camuedlabs.org`). Nginx is no longer needed since cloudfare alse takes care of reverse proxy.
 
+### Phase 3: ETL Pipeline Development (Current)
+
+Currently in the phase of adding and debugging the scraping script. The ETL pipeline follows a multi-stage data extraction and processing workflow:
+
+#### Scraping Logic Flow
+
+1. **HTML Scraping**: The script uses Selenium WebDriver to scrape HTML content from fbref.com, handling Cloudflare challenges that block automated requests
+2. **HTML Storage**: Extracted HTML content is saved to text files (`data_html/*.txt`) for persistence and debugging
+3. **Data Parsing**: The saved HTML files are parsed using BeautifulSoup to extract structured data (tables, statistics)
+4. **CSV Generation**: Parsed data is transformed into CSV format and saved to `uncleaned_data_csv/` directory for further processing
+
+**Current Challenges:**
+- Cloudflare bot detection requiring Selenium instead of simple HTTP requests
+- Handling multiple seasons and data types (squad stats, player stats, wages, etc.)
+- Ensuring robust error handling and retry logic for web scraping operations
+
 ## File Structure
 
 ```
