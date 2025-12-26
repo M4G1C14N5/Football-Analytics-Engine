@@ -75,15 +75,21 @@ Currently in the phase of adding and debugging the scraping script. The ETL pipe
 
 #### Scraping Logic Flow
 
-1. **HTML Scraping**: The script uses Selenium WebDriver to scrape HTML content from fbref.com, handling Cloudflare challenges that block automated requests
-2. **HTML Storage**: Extracted HTML content is saved to text files (`data_html/*.txt`) for persistence and debugging
-3. **Data Parsing**: The saved HTML files are parsed using BeautifulSoup to extract structured data (tables, statistics)
-4. **CSV Generation**: Parsed data is transformed into CSV format and saved to `uncleaned_data_csv/` directory for further processing
+graph LR
+    A[Chromium Driver] -- "Access fbref.com" --> B(Raw HTML)
+    B -- "Save Snapshot" --> C[data_html/*.txt]
+    C -- "BeautifulSoup Parsing" --> D{Pandas DataFrame}
+    D -- "Structured Export" --> E[uncleaned_data_csv/*.csv]
+    E -- "Orchestration" --> F((Airflow DAG))
 
 **Current Challenges:**
 - Cloudflare bot detection requiring Selenium instead of simple HTTP requests
 - Handling multiple seasons and data types (squad stats, player stats, wages, etc.)
 - Ensuring robust error handling and retry logic for web scraping operations
+
+**Solution**
+- Selenium & Chromium: utilizes a headless Chromium Driver within the Docker environment to simulate real user interactions, bypassing anti-bot measures like Cloudflare challenges.
+- Docker Optimization: The Chrome environment and necessary drivers are baked directly into the etl_job Dockerfile to ensure a consistent, "plug-and-play" scraping environment.
 
 ## File Structure
 
