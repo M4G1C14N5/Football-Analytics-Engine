@@ -1,11 +1,11 @@
 version: '3.8'
 
-# Shared settings for all Airflow components
 x-airflow-common: &airflow-common
   image: apache/airflow:2.7.1
   environment:
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASS}@db:5432/airflow_db
+    # Changed from airflow_db to airflow_user to match your requirement
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${DB_USER}:${DB_PASS}@db:5432/airflow_user
     - AIRFLOW__CORE__FERNET_KEY=${FERNET_KEY}
     - AIRFLOW__CORE__LOAD_EXAMPLES=false
   volumes:
@@ -21,32 +21,30 @@ x-airflow-common: &airflow-common
     - analytics_net
 
 services:
-  # 1. The Database (Shared by Airflow and your Dashboard)
   db:
     image: postgres:15
     restart: always
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASS}
-      - POSTGRES_DB=${DB_NAME}
+      # This creates the default database; ensure DB_NAME in .env is airflow_user
+      - POSTGRES_DB=${DB_NAME} 
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 10s
       timeout: 5s
       retries: 5
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # You'll need an init script here to create the 'airflow_db' database
       - ./init-db:/docker-entrypoint-initdb.d
     networks:
       - analytics_net
 
-  # 2. Airflow Setup (Runs migrations and creates the admin user)
   airflow-init:
     <<: *airflow-common
+    # Updated to ensure the correct database is migrated
     command: version && airflow db migrate && airflow users create --username admin --firstname peter --lastname parker --role Admin --email admin@example.com --password admin
 
-  # 3. Airflow Webserver (UI on port 8080)
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -54,13 +52,11 @@ services:
       - "8080:8080"
     restart: always
 
-  # 4. Airflow Scheduler (Triggers your ETL scripts)
   airflow-scheduler:
     <<: *airflow-common
     command: scheduler
     restart: always
 
-  # 5. The Streamlit Dashboard
   dashboard:
     build: ./dashboard
     restart: always
@@ -70,18 +66,20 @@ services:
     networks:
       - analytics_net
 
-  # 6. The Cloudflare Tunnel
   tunnel:
     image: cloudflare/cloudflared:latest
     restart: always
+    # Corrected command to use the token from your .env
     command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     networks:
       - analytics_net
 
-  # 7. The ETL Job (Custom environment for scraping and processing)
   etl_job:
     build:
       context: ./etl_job
+      dockerfile: Dockerfile
+    shm_size: '2gb'
+    user: root  # Ensuring root permissions to access the mounted volume
     depends_on:
       db:
         condition: service_healthy
@@ -90,6 +88,10 @@ services:
       - DB_PASS=${DB_PASS}
       - DB_NAME=${DB_NAME}
       - DB_HOST=db
+      - PYTHONPATH=/app  # Explicitly setting the path for Python
+    volumes:
+      # Using a trailing slash to ensure it mounts as a directory
+      - ./etl_job:/app/
     networks:
       - analytics_net
 
